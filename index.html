@@ -3,25 +3,18 @@
 <head>
     <meta charset="utf-8">
     <title>3D Maze Game</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            font-family: Arial, sans-serif;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="info">
         <div>Coins: <span id="coins">0</span>/5</div>
         <div id="message"></div>
     </div>
+    
+    <div class="instructions">
+        Click to play! Use WASD keys to move. Collect all golden coins to win!
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
     <script src="game.js"></script>
