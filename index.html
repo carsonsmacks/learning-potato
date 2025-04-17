@@ -1,22 +1,227 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>3D Maze Game</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAN Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #chat-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        #message-input {
+            width: calc(100% - 90px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #send-button {
+            width: 80px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #send-button:hover {
+            background-color: #45a049;
+        }
+        #peer-id {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .message {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .local {
+            background-color: #e3f2fd;
+            text-align: right;
+        }
+        .remote {
+            background-color: #f1f1f1;
+        }
+        #connection-status {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .connected {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .disconnected {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
 </head>
 <body>
-    <div id="info">
-        <div>Coins: <span id="coins">0</span>/5</div>
-        <div id="message"></div>
-    </div>
+    <h1>LAN Chat</h1>
     
-    <div class="instructions">
-        Click to play! Use WASD keys to move. Collect all golden coins to win!
+    <div id="chat-container">
+        <div id="connection-status" class="disconnected">Not connected to any peer</div>
+        <p>Your ID: <span id="peer-id">Generating...</span></p>
+        <p>Connect to peer: <input type="text" id="remote-peer-id" placeholder="Enter peer ID">
+        <button id="connect-button">Connect</button></p>
+        
+        <div id="messages"></div>
+        
+        <input type="text" id="message-input" placeholder="Type your message here...">
+        <button id="send-button">Send</button>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
-    <script src="game.js"></script>
+
+    <script>
+        // Simple WebRTC-based LAN chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const messagesContainer = document.getElementById('messages');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const peerIdDisplay = document.getElementById('peer-id');
+            const remotePeerIdInput = document.getElementById('remote-peer-id');
+            const connectButton = document.getElementById('connect-button');
+            const connectionStatus = document.getElementById('connection-status');
+            
+            let peer;
+            let conn;
+            let myId;
+            
+            // Initialize PeerJS (using cloud peer server)
+            function initializePeer() {
+                // Create a random peer ID if none exists in localStorage
+                const savedPeerId = localStorage.getItem('peerId');
+                peer = new Peer(savedPeerId || null);
+                
+                peer.on('open', function(id) {
+                    myId = id;
+                    peerIdDisplay.textContent = id;
+                    // Save the ID for future use
+                    localStorage.setItem('peerId', id);
+                    connectionStatus.textContent = 'Waiting for connection...';
+                    connectionStatus.className = 'disconnected';
+                });
+                
+                peer.on('connection', function(connection) {
+                    conn = connection;
+                    setupConnection();
+                });
+                
+                peer.on('error', function(err) {
+                    console.error('Peer error:', err);
+                    connectionStatus.textContent = 'Error: ' + err.message;
+                    connectionStatus.className = 'disconnected';
+                });
+                
+                peer.on('disconnected', function() {
+                    connectionStatus.textContent = 'Connection lost. Reconnecting...';
+                    connectionStatus.className = 'disconnected';
+                    peer.reconnect();
+                });
+            }
+            
+            // Set up event handlers for an established connection
+            function setupConnection() {
+                conn.on('open', function() {
+                    connectionStatus.textContent = 'Connected to peer!';
+                    connectionStatus.className = 'connected';
+                });
+                
+                conn.on('data', function(data) {
+                    addMessage(data, 'remote');
+                });
+                
+                conn.on('close', function() {
+                    connectionStatus.textContent = 'Disconnected from peer';
+                    connectionStatus.className = 'disconnected';
+                });
+                
+                conn.on('error', function(err) {
+                    console.error('Connection error:', err);
+                    connectionStatus.textContent = 'Connection error: ' + err.message;
+                    connectionStatus.className = 'disconnected';
+                });
+            }
+            
+            // Connect to a remote peer
+            connectButton.addEventListener('click', function() {
+                const remoteId = remotePeerIdInput.value.trim();
+                if (!remoteId) return;
+                
+                if (conn) {
+                    conn.close();
+                }
+                
+                conn = peer.connect(remoteId);
+                setupConnection();
+            });
+            
+            // Send a message
+            function sendMessage() {
+                const message = messageInput.value.trim();
+                if (!message || !conn || !conn.open) return;
+                
+                conn.send(message);
+                addMessage(message, 'local');
+                messageInput.value = '';
+            }
+            
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Add a message to the chat UI
+            function addMessage(message, type) {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${type}`;
+                messageElement.textContent = message;
+                messagesContainer.appendChild(messageElement);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            // Load PeerJS library dynamically
+            function loadPeerJS() {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js';
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+            }
+            
+            // Initialize the application
+            loadPeerJS()
+                .then(initializePeer)
+                .catch(err => {
+                    console.error('Failed to load PeerJS:', err);
+                    connectionStatus.textContent = 'Failed to load chat library. Please check your internet connection.';
+                    connectionStatus.className = 'disconnected';
+                });
+        });
+    </script>
 </body>
 </html>
